@@ -1,21 +1,17 @@
 import PropTypes from "prop-types";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-const Login = ({ handleSubmit, setSignUp }) => {
+const SignUp = ({ handleSignUp, setSignUp }) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
 
-    useEffect(() => {
-        console.log(email);
-    }, [email]);
-
     return (
-        <div className="login">
-            <h1>Login</h1>
+        <div className="signup">
+            <h1>Sign Up</h1>
             <form
                 onSubmit={(e) => {
                     e.preventDefault();
-                    handleSubmit(email, password);
+                    handleSignUp();
                 }}
             >
                 <input
@@ -31,18 +27,18 @@ const Login = ({ handleSubmit, setSignUp }) => {
                     value={password}
                 />
                 <p>
-                    you are new here?{" "}
-                    <span onClick={() => setSignUp(true)}>sign up</span>
+                    you already have an account?{" "}
+                    <span onClick={() => setSignUp(false)}>login</span>
                 </p>
-                <button type="submit">Login</button>
+                <button type="submit">Sign Up</button>
             </form>
         </div>
     );
 };
 
-Login.propTypes = {
-    handleSubmit: PropTypes.func.isRequired,
+SignUp.propTypes = {
+    handleSignUp: PropTypes.func.isRequired,
     setSignUp: PropTypes.func.isRequired,
 };
 
-export default Login;
+export default SignUp;

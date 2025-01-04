@@ -5,7 +5,8 @@ body {
     background-color: #f5f5f5;
 }
 
-.login {
+.login,
+.signup {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -14,7 +15,7 @@ body {
     height: 100vh;
     background-color: #f5f5f5;
 }
-.login form {
+:is(.login, .signup) form {
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -26,13 +27,21 @@ body {
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     text-align: center;
 }
-.login form input {
+:is(.login, .signup) form input {
     padding: 10px;
     border: 1px solid #ddd;
     border-radius: 5px;
     outline: none;
 }
-.login form button {
+:is(.login, .signup) form p {
+    margin: 0;
+}
+:is(.login, .signup) form p span {
+    color: #007bff;
+    text-decoration: underline;
+    cursor: pointer;
+}
+:is(.login, .signup) form button {
     padding: 10px;
     border: none;
     border-radius: 5px;

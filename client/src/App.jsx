@@ -1,41 +1,58 @@
 import axios from "axios";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Login from "./components/Login";
 import "./index.css";
+import SignUp from "./components/SignUp";
 
 const App = () => {
-    const [loggedIn, setLoggedIn] = useState(false);
+    const [login, setLogin] = useState(false);
+    const [signUp, setSignUp] = useState(false);
 
     const handleSubmit = useCallback(async (email, password) => {
         axios
             .post("http://localhost:3000/login", { email, password })
             .then(({ data }) => {
                 console.log(data);
-                if (data?.message.length) setLoggedIn(true);
+                if (data?.message.length) setLogin(true);
             })
             .catch((e) => {
                 console.log(e.response);
             });
     }, []);
 
-    axios
-        .get("http://localhost:3000/login")
-        .then(({ data }) => {
-            console.log(data);
+    const handleSignUp = useCallback(async (email, password) => {
+        axios
+            .post("http://localhost:3000/register", { email, password })
+            .then(({ data }) => {
+                console.log(data);
+            })
+            .catch((e) => {
+                console.log(e.response);
+            });
+    }, []);
 
-            if (data === "Logged in") setLoggedIn(true);
-        })
-        .catch((e) => {
-            console.log(e.response);
-            setLoggedIn(false);
-        });
+    useEffect(() => {
+        axios
+            .get("http://localhost:3000/login")
+            .then(({ data }) => {
+                console.log(data);
+
+                if (data === "Logged in") setLogin(true);
+            })
+            .catch((e) => {
+                console.log(e.response);
+                setLogin(false);
+            });
+    }, []);
 
     return (
         <div>
-            {loggedIn ? (
+            {login ? (
                 <h1>Welcome</h1>
+            ) : signUp ? (
+                <SignUp handleSignUp={handleSignUp} setSignUp={setSignUp} />
             ) : (
-                <Login handleSubmit={handleSubmit} />
+                <Login handleSubmit={handleSubmit} setSignUp={setSignUp} />
             )}
         </div>
     );
