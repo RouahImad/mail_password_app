@@ -1,7 +1,6 @@
 require("dotenv").config();
 const express = require("express");
 const app = express();
-const session = require("express-session");
 const {
     sendConfirmEmail,
     sendResetEmail,
@@ -13,22 +12,37 @@ const {
 } = require("./utils.js");
 
 app.use(express.json());
+
+// const session = require("express-session");
+// app.use(
+//     session({
+//         secret: process.env.SESSION_SECRET,
+//         resave: false,
+//         saveUninitialized: false,
+//         cookie: {
+//             secure: false,
+//             httpOnly: true,
+//             maxAge: 1000 * 60 * 60, // 1 hour
+//         },
+//     })
+// );
+
+const cookieSession = require("cookie-session");
+
 app.use(
-    session({
-        secret: process.env.SESSION_SECRET,
-        resave: false,
-        saveUninitialized: true,
-        cookie: {
-            secure: false,
-            maxAge: 1000 * 60 * 60, // 1 hour
-        },
+    cookieSession({
+        keys: [process.env.SESSION_SECRET],
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false,
+        maxAge: 1000 * 60 * 60,
     })
 );
 
 app.use((req, res, next) => {
-    res.setHeader("Content-Type", "application/json");
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader(
         "Access-Control-Allow-Methods",
         "OPTIONS, GET, DELETE, POST, PUT"
@@ -39,96 +53,121 @@ app.use((req, res, next) => {
 });
 
 app.get("/login", (req, res) => {
-    if (req.session.user) return res.send("Logged in");
-    res.status(401).send("Not logged in");
+    if (!req.session.user) return res.status(401).send("Not logged in");
+    if (req.session.user.confirmed == "1")
+        return res.json({
+            message: "Logged in",
+            user: req.session?.user.username,
+        });
+    res.send("Please confirm your account");
 });
 
 app.post("/login", async (req, res) => {
+    if (req.session?.user?.confirmed == "0")
+        return res.send("Please confirm your account");
+
+    const { email, password } = req.body;
+    if (
+        req.session?.user?.password == password &&
+        req.session?.user?.email == email
+    )
+        return res.json({
+            message: "Logged in successfully",
+            user: req.session?.user.username,
+        });
+
     try {
-        const { email, password } = req.body;
-        const query = `SELECT * FROM users WHERE email = ? AND password = ?`;
-        const [users] = await pool.query(query, [email, password]);
+        const users = await selectUser(email, password);
 
         if (!users.length)
             return res.status(401).json({ error: "Invalid credentials" });
-
         req.session.user = users[0];
-        return res.json({ message: "Logged in successfully" });
+
+        return res.json({
+            message: "Logged in successfully",
+            user: users[0].username,
+        });
     } catch (err) {
-        console.log(err);
+        console.error(err);
         return res.status(500).json({ error: "Server error" });
     }
 });
 
 app.post("/register", async (req, res) => {
     try {
-        const { email, password } = req.body;
-        if (!email || !password)
-            return res.status(401).json({ error: "Invalid credentials" });
+        const { email, password, username } = req.body;
+
+        if (!email || !password || !username)
+            return res.status(401).json({ error: "Credentials Needed" });
 
         const token = generateToken();
         const expiry = expirationDate();
-        const rs = await insertUser(email, password, token, expiry);
-        req.session.user = await selectUser(rs[0].insertId);
-        let fullUrl =
-            req.protocol + "://" + req.get("host") + "/register" + token;
+        req.session.user = {
+            username,
+            email,
+            password,
+            confirmed: 0,
+            confirmationToken: token,
+            tokenExpiry: expiry,
+        };
 
-        sendConfirmEmail(email, fullUrl, expiry);
-        return res.json({
-            message:
-                "Registration successful, please confirm your email to finish the sign up",
-        });
+        let fullUrl =
+            req.protocol + "://" + req.get("host") + "/confirm/" + token;
+
+        try {
+            await sendConfirmEmail(username, email, fullUrl, expiry);
+            return res.json({
+                message:
+                    "Registration successful, please confirm your email to finish the sign up",
+            });
+        } catch (error) {
+            console.error("Failed to send email:", error);
+            return res.status(500).json({
+                error: "Registration failed, failed to send the email",
+            });
+        }
     } catch (err) {
-        console.log(err);
+        console.error(err);
         return res.status(400).json({ error: "Registration failed" });
     }
 });
 
-app.post("/confirm/:slug", async (req, res) => {
-    const slug = req.params;
-    if (!req.session.user) return res.status(401).send("No session found");
-    if (req.session.user.confirmationToken !== slug)
+app.get("/confirm/:slug", async (req, res) => {
+    const { slug } = req.params;
+
+    if (!slug) return res.status(401).json({ error: "Invalid Token" });
+    if (!req.session.user) return res.status(401).send("No Session Found");
+    if (req.session.user.confirmed == "1")
+        return res.send("Account Already Confirmed");
+    if (req.session.user.confirmationToken != slug)
         return res.status(401).send("Wrong Token");
     if (req.session.user.tokenExpiry < getNow())
-        return res.status(401).send("token expired !! please sign up again");
-
+        return res.status(401).send("Token Expired!! Please sign up again");
+    const { username, email, password } = req.session.user;
     try {
-        const update = `UPDATE users SET confirmed = 1, confirmationToken = null, tokenExpiry = null WHERE id = ?`;
-        await pool.query(update, [user.id]);
+        await insertUser(username, email, password, null, 1, null);
         req.session.user = {
             ...req.session.user,
-            confirmed: 1,
             confirmationToken: null,
+            confirmed: 1,
             tokenExpiry: null,
         };
+
         return res.send("Account confirmed");
     } catch (err) {
-        console.log(err);
+        console.error(err);
         return res.status(500).send("Server error");
     }
 });
 
-// app.post("/confirm", async (req, res) => {
-//     try {
-//         const { email, token } = req.body;
-//         const query = `SELECT * FROM users WHERE email = ? AND confirmationToken = ?`;
-//         const [users] = await pool.query(query, [email, token]);
+app.use((req, res, next) => {
+    res.status(404).json({ error: "Route not found" });
+});
 
-//         if (!users.length)
-//             return res.status(401).json({ error: "Invalid token" });
-
-//         const user = users[0];
-//         if (new Date(user.tokenExpiry) < new Date())
-//             return res.status(401).json({ error: "Token expired" });
-
-//         const update = `UPDATE users SET confirmed = 1, confirmationToken = null, tokenExpiry = null WHERE id = ?`;
-//         await pool.query(update, [user.id]);
-//         return res.json({ message: "Account confirmed" });
-//     } catch (err) {
-//         console.log(err);
-//         return res.status(500).json({ error: "Server error" });
-//     }
-// });
+app.listen(3000, (err) => {
+    if (err) return console.error(err);
+    console.log("listenning on 3000");
+});
 
 // app.post("/forgot-password", async (req, res) => {
 //     try {
@@ -157,8 +196,3 @@ app.post("/confirm/:slug", async (req, res) => {
 
 //     res.send("Email sent");
 // });
-
-app.listen(3000, (err) => {
-    if (err) return console.log(err);
-    console.log("listenning on 3000");
-});

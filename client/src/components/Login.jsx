@@ -1,14 +1,9 @@
 import PropTypes from "prop-types";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const Login = ({ handleSubmit, setSignUp }) => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-
-    useEffect(() => {
-        console.log(email);
-    }, [email]);
-
     return (
         <div className="login">
             <h1>Login</h1>
@@ -23,12 +18,14 @@ const Login = ({ handleSubmit, setSignUp }) => {
                     placeholder="Email"
                     onChange={(e) => setEmail(e.target.value.trim())}
                     value={email}
+                    autoComplete="true"
                 />
                 <input
                     type="password"
                     placeholder="Password"
                     onChange={(e) => setPassword(e.target.value.trim())}
                     value={password}
+                    autoComplete="true"
                 />
                 <p>
                     you are new here?{" "}

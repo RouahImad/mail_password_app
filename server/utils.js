@@ -4,6 +4,15 @@ const moment = require("moment");
 const pool = require("./db.js");
 require("dotenv").config();
 
+const transporter = nodemailer.createTransport({
+    service: "gmail",
+    host: "smtp.gmail.com",
+    auth: {
+        user: process.env.EMAIL,
+        pass: process.env.PASSWORD,
+    },
+});
+
 const generateToken = () => {
     return crypto.randomBytes(20).toString("hex");
 };
@@ -16,37 +25,51 @@ const getNow = () => {
     return moment().format("YYYY-MM-DD HH:mm:ss");
 };
 
-const selectUser = async (id) => {
-    const rs = await pool.query("select * from users where id = ?", [id]);
-    return rs[0][0];
+const selectUser = async (email, password) => {
+    const query = `SELECT * FROM users WHERE email = ? AND password = ?`;
+    const [users] = await pool.query(query, [email, password]);
+    return users;
 };
 
-const insertUser = async (email, password, token, expiry) => {
-    const query = `INSERT INTO users (email, password, confirmationToken, tokenExpiry) VALUES (?, ?, ?, ?)`;
-    return await pool.query(query, [email, password, token, expiry]);
+const insertUser = async (
+    username,
+    email,
+    password,
+    token,
+    confirmed,
+    expiry
+) => {
+    const query = `INSERT INTO users (username, email, password, confirmationToken, 
+                    confirmed, tokenExpiry) VALUES (?, ?, ?, ?, ?, ?)`;
+    return await pool.query(query, [
+        username,
+        email,
+        password,
+        token,
+        confirmed,
+        expiry,
+    ]);
 };
 
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    host: "smtp.gmail.com",
-    auth: {
-        user: process.env.EMAIL,
-        pass: process.env.PASSWORD,
-    },
-});
-
-function sendConfirmEmail(email, link, expirationDate) {
+function sendConfirmEmail(name, email, link, expirationDate) {
     const mailOptions = {
         from: process.env.EMAIL,
         to: email,
         subject: "Account confirmation",
-        text: `Please Confirm Your Account By Going: ${link}\nToken Expires at: ${expirationDate}`,
+        text: `Hey ${name} Thank You For Joining Us\nPlease Confirm Your Account By Going To This Link: ${link}\nToken Expires at: ${expirationDate}\nFarewell.`,
     };
+    console.log("sending email...");
 
-    transporter.sendMail(mailOptions, function (error, info) {
-        if (error) return console.log(error);
-
-        console.log("Email sent: " + info.response);
+    return new Promise((resolve, reject) => {
+        transporter.sendMail(mailOptions, function (error, info) {
+            if (error) {
+                console.log(error);
+                reject(error);
+            } else {
+                console.log("Email sent: " + info.response);
+                resolve(info);
+            }
+        });
     });
 }
 

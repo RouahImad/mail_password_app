@@ -2,6 +2,7 @@ import PropTypes from "prop-types";
 import { useState } from "react";
 
 const SignUp = ({ handleSignUp, setSignUp }) => {
+    const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
 
@@ -11,14 +12,21 @@ const SignUp = ({ handleSignUp, setSignUp }) => {
             <form
                 onSubmit={(e) => {
                     e.preventDefault();
-                    handleSignUp();
+                    handleSignUp(username, email, password);
                 }}
             >
+                <input
+                    type="text"
+                    placeholder="Username"
+                    onChange={(e) => setUsername(e.target.value.trim())}
+                    value={username}
+                />
                 <input
                     type="email"
                     placeholder="Email"
                     onChange={(e) => setEmail(e.target.value.trim())}
                     value={email}
+                    autoCorrect="true"
                 />
                 <input
                     type="password"
